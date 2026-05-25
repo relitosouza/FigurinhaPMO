@@ -352,16 +352,17 @@ export default function CanvasPreview({
         // Draw template base first
         ctx.drawImage(imgTemplate, 0, 0, canvas.width, canvas.height);
 
-        // Draw player photo on top of template, clipped to inner border
+        // Draw player photo on top of template, clipped to inner border (expanded upwards to fit the head)
         if (imgPlayer) {
           ctx.save();
           const cx = 250;
           const cy = 490;
           
           ctx.beginPath();
-          ctx.rect(30, 150, 540, 520);
+          ctx.rect(30, 30, 540, 640); // Clip from Y=30 to Y=670 to fit the head
           ctx.clip();
 
+          ctx.save();
           ctx.translate(cx + photoX, cy + photoY);
           ctx.scale(photoScale, photoScale);
 
@@ -372,6 +373,18 @@ export default function CanvasPreview({
           const dh = h * scale;
 
           ctx.drawImage(imgPlayer, -dw / 2, -dh / 2, dw, dh);
+          ctx.restore();
+
+          // Apply linear gradient mask (eraser effect) to blend the bottom smoothly
+          const fadeGrad = ctx.createLinearGradient(0, 520, 0, 670);
+          fadeGrad.addColorStop(0, "rgba(0, 0, 0, 1)");
+          fadeGrad.addColorStop(0.7, "rgba(0, 0, 0, 0.95)");
+          fadeGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+          ctx.globalCompositeOperation = "destination-in";
+          ctx.fillStyle = fadeGrad;
+          ctx.fillRect(30, 30, 540, 640);
+
           ctx.restore();
         }
 
@@ -409,8 +422,8 @@ export default function CanvasPreview({
 
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(40, 330);
-        ctx.lineTo(460, 330);
+        ctx.moveTo(40, 100);             // Raise top clip to Y=100
+        ctx.lineTo(460, 100);
         ctx.lineTo(460, 660);
         ctx.lineTo(90, 660);
         ctx.quadraticCurveTo(40, 660, 40, 610);
@@ -421,7 +434,7 @@ export default function CanvasPreview({
         glowGrad.addColorStop(0, "rgba(255, 255, 255, 0.15)");
         glowGrad.addColorStop(1, "rgba(0, 0, 0, 0.25)");
         ctx.fillStyle = glowGrad;
-        ctx.fillRect(40, 330, 420, 330);
+        ctx.fillRect(40, 100, 420, 560); // Expand background glow rect to start at Y=100
 
         if (imgPlayer) {
           ctx.save();
@@ -438,6 +451,16 @@ export default function CanvasPreview({
 
           ctx.drawImage(imgPlayer, -dw / 2, -dh / 2, dw, dh);
           ctx.restore();
+
+          // Apply linear gradient mask (eraser effect) to blend the bottom smoothly
+          const fadeGrad = ctx.createLinearGradient(0, 520, 0, 660);
+          fadeGrad.addColorStop(0, "rgba(0, 0, 0, 1)");
+          fadeGrad.addColorStop(0.7, "rgba(0, 0, 0, 0.95)");
+          fadeGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+          ctx.globalCompositeOperation = "destination-in";
+          ctx.fillStyle = fadeGrad;
+          ctx.fillRect(40, 100, 420, 560);
         } else {
           ctx.fillStyle = theme === "platinum" ? "#455A64" : "rgba(255, 255, 255, 0.2)";
           ctx.beginPath();
