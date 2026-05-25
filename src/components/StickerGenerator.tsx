@@ -20,7 +20,12 @@ export default function StickerGenerator() {
   const [photoScale, setPhotoScale] = useState(1.0);
   const [photoX, setPhotoX] = useState(0);
   const [photoY, setPhotoY] = useState(0);
-  const [photoFadeY, setPhotoFadeY] = useState(520);
+
+  // Eraser brush states
+  const [eraserMode, setEraserMode] = useState(false);
+  const [brushSize, setBrushSize] = useState(30);
+  const [resetEraserTrigger, setResetEraserTrigger] = useState(0);
+  const [undoEraserTrigger, setUndoEraserTrigger] = useState(0);
 
   // Text coordinate positions (matching default Panini 2026 vector template)
   const [nameY, setNameY] = useState(697);
@@ -221,8 +226,12 @@ export default function StickerGenerator() {
             setPhotoX={setPhotoX}
             photoY={photoY}
             setPhotoY={setPhotoY}
-            photoFadeY={photoFadeY}
-            setPhotoFadeY={setPhotoFadeY}
+            eraserMode={eraserMode}
+            setEraserMode={setEraserMode}
+            brushSize={brushSize}
+            setBrushSize={setBrushSize}
+            onResetEraser={() => setResetEraserTrigger(prev => prev + 1)}
+            onUndoEraser={() => setUndoEraserTrigger(prev => prev + 1)}
             nameY={nameY}
             setNameY={setNameY}
             teamY={teamY}
@@ -257,7 +266,10 @@ export default function StickerGenerator() {
               photoY={photoY}
               setPhotoX={setPhotoX}
               setPhotoY={setPhotoY}
-              photoFadeY={photoFadeY}
+              eraserMode={eraserMode}
+              brushSize={brushSize}
+              resetEraserTrigger={resetEraserTrigger}
+              undoEraserTrigger={undoEraserTrigger}
               nameY={nameY}
               teamY={teamY}
               overallX={overallX}

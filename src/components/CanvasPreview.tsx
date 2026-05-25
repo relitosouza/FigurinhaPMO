@@ -24,7 +24,10 @@ interface CanvasPreviewProps {
   photoY: number;
   setPhotoX: (x: number) => void;
   setPhotoY: (y: number) => void;
-  photoFadeY: number;
+  eraserMode: boolean;
+  brushSize: number;
+  resetEraserTrigger: number;
+  undoEraserTrigger: number;
 
   // Text coordinate overrides
   nameY: number;
@@ -185,7 +188,10 @@ export default function CanvasPreview({
   photoY,
   setPhotoX,
   setPhotoY,
-  photoFadeY,
+  eraserMode,
+  brushSize,
+  resetEraserTrigger,
+  undoEraserTrigger,
   nameY,
   teamY,
   overallX,
@@ -195,6 +201,132 @@ export default function CanvasPreview({
   const [fontLoaded, setFontLoaded] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   
+  // Offscreen canvas for manual eraser mask
+  const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const maskHistoryRef = useRef<ImageData[]>([]);
+  const lastMaskPosRef = useRef<{ x: number; y: number } | null>(null);
+  const [drawTrigger, setDrawTrigger] = useState(0);
+  const [brushPos, setBrushPos] = useState<{ x: number; y: number } | null>(null);
+  const [canvasClientWidth, setCanvasClientWidth] = useState(352);
+
+  // Observe canvas client width changes to scale the brush cursor overlay size correctly
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const updateWidth = () => {
+      setCanvasClientWidth(canvas.clientWidth);
+    };
+
+    updateWidth();
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(canvas);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  // Loaded images cached in refs
+  const templateImgRef = useRef<HTMLImageElement | null>(null);
+  const playerImgRef = useRef<HTMLImageElement | null>(null);
+  const [imagesReady, setImagesReady] = useState(false);
+
+  // Load template image on change
+  useEffect(() => {
+    if (!templateSrc) {
+      templateImgRef.current = null;
+      setImagesReady(prev => !prev);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      templateImgRef.current = img;
+      setImagesReady(prev => !prev);
+    };
+    img.onerror = () => {
+      console.error("Failed to load template:", templateSrc);
+      templateImgRef.current = null;
+      setImagesReady(prev => !prev);
+    };
+    img.src = templateSrc;
+  }, [templateSrc]);
+
+  // Load player image on change
+  useEffect(() => {
+    if (!imageSrc) {
+      playerImgRef.current = null;
+      setImagesReady(prev => !prev);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      playerImgRef.current = img;
+      setImagesReady(prev => !prev);
+    };
+    img.onerror = () => {
+      console.error("Failed to load player image:", imageSrc);
+      playerImgRef.current = null;
+      setImagesReady(prev => !prev);
+    };
+    img.src = imageSrc;
+  }, [imageSrc]);
+
+  // Clear mask canvas if imageSrc changes
+  useEffect(() => {
+    maskCanvasRef.current = null;
+    maskHistoryRef.current = [];
+  }, [imageSrc]);
+
+  // Save current mask state for Undo/Desfazer
+  const saveMaskState = () => {
+    const mask = maskCanvasRef.current;
+    if (!mask) return;
+    const mCtx = mask.getContext("2d");
+    if (!mCtx) return;
+    const imgData = mCtx.getImageData(0, 0, mask.width, mask.height);
+    
+    // Limit history to 15 states
+    const history = maskHistoryRef.current;
+    history.push(imgData);
+    if (history.length > 15) {
+      history.shift();
+    }
+  };
+
+  // Undo mask state if undoEraserTrigger changes
+  useEffect(() => {
+    if (undoEraserTrigger > 0 && maskCanvasRef.current) {
+      const history = maskHistoryRef.current;
+      if (history.length > 0) {
+        const lastState = history.pop();
+        if (lastState) {
+          const mCtx = maskCanvasRef.current.getContext("2d");
+          if (mCtx) {
+            mCtx.putImageData(lastState, 0, 0);
+            setDrawTrigger(prev => prev + 1);
+          }
+        }
+      }
+    }
+  }, [undoEraserTrigger]);
+
+  // Reset mask if resetEraserTrigger changes
+  useEffect(() => {
+    if (maskCanvasRef.current) {
+      const mCtx = maskCanvasRef.current.getContext("2d");
+      if (mCtx) {
+        saveMaskState(); // Save state before resetting to allow undoing the reset!
+        mCtx.save();
+        mCtx.fillStyle = "#ffffff";
+        mCtx.fillRect(0, 0, maskCanvasRef.current.width, maskCanvasRef.current.height);
+        mCtx.restore();
+        setDrawTrigger(prev => prev + 1);
+      }
+    }
+  }, [resetEraserTrigger]);
+
   // Track start point of mouse drag
   const dragStartRef = useRef({ x: 0, y: 0, photoX: 0, photoY: 0 });
 
@@ -208,17 +340,79 @@ export default function CanvasPreview({
   }, []);
 
   // -------------------------------------------------------------
-  // Dragging event handlers to position player photo
+  // Draw points on the eraser mask canvas
+  // -------------------------------------------------------------
+  const drawEraserPoint = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !maskCanvasRef.current) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = ((clientX - rect.left) / rect.width) * canvas.width;
+    const my = ((clientY - rect.top) / rect.height) * canvas.height;
+
+    const cx = 250;
+    const cy = 490;
+    const w = maskCanvasRef.current.width;
+    const h = maskCanvasRef.current.height;
+    const scale = Math.max(420 / w, 440 / h);
+    const totalScale = photoScale * scale;
+
+    const ix = (mx - (cx + photoX)) / totalScale + w / 2;
+    const iy = (my - (cy + photoY)) / totalScale + h / 2;
+
+    const maskCanvas = maskCanvasRef.current;
+    const mCtx = maskCanvas.getContext("2d");
+    if (mCtx) {
+      mCtx.save();
+      mCtx.globalCompositeOperation = "destination-out";
+      mCtx.strokeStyle = "rgba(0, 0, 0, 1)";
+      mCtx.lineWidth = brushSize / totalScale;
+      mCtx.lineCap = "round";
+      mCtx.lineJoin = "round";
+      mCtx.beginPath();
+      if (lastMaskPosRef.current) {
+        mCtx.moveTo(lastMaskPosRef.current.x, lastMaskPosRef.current.y);
+      } else {
+        mCtx.moveTo(ix, iy);
+      }
+      mCtx.lineTo(ix, iy);
+      mCtx.stroke();
+      mCtx.restore();
+      
+      setDrawTrigger(prev => prev + 1);
+    }
+
+    lastMaskPosRef.current = { x: ix, y: iy };
+  };
+
+  // -------------------------------------------------------------
+  // Mouse and Touch event handlers
   // -------------------------------------------------------------
   const handleStart = (clientX: number, clientY: number) => {
     if (!imageSrc) return;
     setIsDragging(true);
-    dragStartRef.current = {
-      x: clientX,
-      y: clientY,
-      photoX: photoX,
-      photoY: photoY
-    };
+    
+    if (eraserMode) {
+      saveMaskState(); // Save state to history before drawing
+      lastMaskPosRef.current = null;
+      drawEraserPoint(clientX, clientY);
+
+      // Set brush pos immediately
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        setBrushPos({ x, y });
+      }
+    } else {
+      dragStartRef.current = {
+        x: clientX,
+        y: clientY,
+        photoX: photoX,
+        photoY: photoY
+      };
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -227,21 +421,40 @@ export default function CanvasPreview({
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches && e.touches[0]) {
-      handleStart(e.touches[0].clientX, e.touches[0].clientY);
+      const touch = e.touches[0];
+      // Vertical offset of -50px so finger does not cover the brush preview/erased area on mobile
+      const clientY = eraserMode ? touch.clientY - 50 : touch.clientY;
+      handleStart(touch.clientX, clientY);
     }
   };
 
   const handleMove = (clientX: number, clientY: number) => {
-    if (!isDragging || !canvasRef.current) return;
+    if (!canvasRef.current) return;
     const canvas = canvasRef.current;
     
-    // Scale client drag movement to actual canvas coordinate resolution
-    const scaleFactor = canvas.width / canvas.clientWidth;
-    const dx = (clientX - dragStartRef.current.x) * scaleFactor;
-    const dy = (clientY - dragStartRef.current.y) * scaleFactor;
+    // Update brush overlay cursor if eraserMode is active
+    if (eraserMode) {
+      const rect = canvas.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      setBrushPos({ x, y });
+    } else {
+      setBrushPos(null);
+    }
 
-    setPhotoX(Math.round(dragStartRef.current.photoX + dx));
-    setPhotoY(Math.round(dragStartRef.current.photoY + dy));
+    if (!isDragging) return;
+
+    if (eraserMode) {
+      drawEraserPoint(clientX, clientY);
+    } else {
+      // Scale client drag movement to actual canvas coordinate resolution
+      const scaleFactor = canvas.width / canvas.clientWidth;
+      const dx = (clientX - dragStartRef.current.x) * scaleFactor;
+      const dy = (clientY - dragStartRef.current.y) * scaleFactor;
+
+      setPhotoX(Math.round(dragStartRef.current.photoX + dx));
+      setPhotoY(Math.round(dragStartRef.current.photoY + dy));
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -250,14 +463,21 @@ export default function CanvasPreview({
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches && e.touches[0]) {
-      // Prevent mobile page scroll when aligning player photo inside canvas
+      // Prevent mobile page scroll when aligning or erasing player photo
       if (e.cancelable) e.preventDefault();
-      handleMove(e.touches[0].clientX, e.touches[0].clientY);
+      const touch = e.touches[0];
+      // Vertical offset of -50px so finger does not cover the brush preview/erased area on mobile
+      const clientY = eraserMode ? touch.clientY - 50 : touch.clientY;
+      handleMove(touch.clientX, clientY);
     }
   };
 
-  const handleEnd = () => {
+  const handleEnd = (hideBrush = false) => {
     setIsDragging(false);
+    lastMaskPosRef.current = null;
+    if (hideBrush) {
+      setBrushPos(null);
+    }
   };
 
   // -------------------------------------------------------------
@@ -354,7 +574,7 @@ export default function CanvasPreview({
         // Draw template base first
         ctx.drawImage(imgTemplate, 0, 0, canvas.width, canvas.height);
 
-        // Draw player photo on top of template, clipped to inner border (expanded upwards to fit the head)
+        // Draw player photo on top of template, clipped to inner border
         if (imgPlayer) {
           ctx.save();
           const cx = 250;
@@ -374,21 +594,22 @@ export default function CanvasPreview({
           const dw = w * scale;
           const dh = h * scale;
 
-          ctx.drawImage(imgPlayer, -dw / 2, -dh / 2, dw, dh);
+          // Composite the player photo with the manual eraser mask
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = w;
+          tempCanvas.height = h;
+          const tempCtx = tempCanvas.getContext("2d");
+          if (tempCtx) {
+            tempCtx.drawImage(imgPlayer, 0, 0);
+            if (maskCanvasRef.current) {
+              tempCtx.globalCompositeOperation = "destination-in";
+              tempCtx.drawImage(maskCanvasRef.current, 0, 0);
+            }
+            ctx.drawImage(tempCanvas, -dw / 2, -dh / 2, dw, dh);
+          } else {
+            ctx.drawImage(imgPlayer, -dw / 2, -dh / 2, dw, dh);
+          }
           ctx.restore();
-
-          // Apply linear gradient mask (eraser effect) to blend the bottom smoothly
-          const fadeStart = photoFadeY;
-          const fadeEnd = Math.min(670, photoFadeY + 120);
-          const fadeGrad = ctx.createLinearGradient(0, fadeStart, 0, fadeEnd);
-          fadeGrad.addColorStop(0, "rgba(0, 0, 0, 1)");
-          fadeGrad.addColorStop(0.7, "rgba(0, 0, 0, 0.95)");
-          fadeGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-
-          ctx.globalCompositeOperation = "destination-in";
-          ctx.fillStyle = fadeGrad;
-          ctx.fillRect(30, 30, 540, 640);
-
           ctx.restore();
         }
 
@@ -426,7 +647,7 @@ export default function CanvasPreview({
 
         ctx.save();
         ctx.beginPath();
-        ctx.moveTo(40, 100);             // Raise top clip to Y=100
+        ctx.moveTo(40, 100);
         ctx.lineTo(460, 100);
         ctx.lineTo(460, 660);
         ctx.lineTo(90, 660);
@@ -438,7 +659,7 @@ export default function CanvasPreview({
         glowGrad.addColorStop(0, "rgba(255, 255, 255, 0.15)");
         glowGrad.addColorStop(1, "rgba(0, 0, 0, 0.25)");
         ctx.fillStyle = glowGrad;
-        ctx.fillRect(40, 100, 420, 560); // Expand background glow rect to start at Y=100
+        ctx.fillRect(40, 100, 420, 560);
 
         if (imgPlayer) {
           ctx.save();
@@ -453,20 +674,22 @@ export default function CanvasPreview({
           const dw = w * scale;
           const dh = h * scale;
 
-          ctx.drawImage(imgPlayer, -dw / 2, -dh / 2, dw, dh);
+          // Composite the player photo with the manual eraser mask
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = w;
+          tempCanvas.height = h;
+          const tempCtx = tempCanvas.getContext("2d");
+          if (tempCtx) {
+            tempCtx.drawImage(imgPlayer, 0, 0);
+            if (maskCanvasRef.current) {
+              tempCtx.globalCompositeOperation = "destination-in";
+              tempCtx.drawImage(maskCanvasRef.current, 0, 0);
+            }
+            ctx.drawImage(tempCanvas, -dw / 2, -dh / 2, dw, dh);
+          } else {
+            ctx.drawImage(imgPlayer, -dw / 2, -dh / 2, dw, dh);
+          }
           ctx.restore();
-
-          // Apply linear gradient mask (eraser effect) to blend the bottom smoothly
-          const fadeStart = photoFadeY;
-          const fadeEnd = Math.min(660, photoFadeY + 120);
-          const fadeGrad = ctx.createLinearGradient(0, fadeStart, 0, fadeEnd);
-          fadeGrad.addColorStop(0, "rgba(0, 0, 0, 1)");
-          fadeGrad.addColorStop(0.7, "rgba(0, 0, 0, 0.95)");
-          fadeGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-
-          ctx.globalCompositeOperation = "destination-in";
-          ctx.fillStyle = fadeGrad;
-          ctx.fillRect(40, 100, 420, 560);
         } else {
           ctx.fillStyle = theme === "platinum" ? "#455A64" : "rgba(255, 255, 255, 0.2)";
           ctx.beginPath();
@@ -651,38 +874,21 @@ export default function CanvasPreview({
       onCanvasReady(canvas);
     };
 
-    const loadAndRender = async () => {
-      let imgTemplate: HTMLImageElement | null = null;
-      let imgPlayer: HTMLImageElement | null = null;
-
-      if (templateSrc) {
-        imgTemplate = await new Promise<HTMLImageElement | null>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => {
-            console.error("Failed to load template:", templateSrc);
-            resolve(null);
-          };
-          img.src = templateSrc;
-        });
+    // Initialize mask canvas if not present using cached player image
+    const imgPlayer = playerImgRef.current;
+    if (imageSrc && imgPlayer && !maskCanvasRef.current) {
+      const mask = document.createElement("canvas");
+      mask.width = imgPlayer.width;
+      mask.height = imgPlayer.height;
+      const mCtx = mask.getContext("2d");
+      if (mCtx) {
+        mCtx.fillStyle = "#ffffff";
+        mCtx.fillRect(0, 0, mask.width, mask.height);
       }
+      maskCanvasRef.current = mask;
+    }
 
-      if (imageSrc) {
-        imgPlayer = await new Promise<HTMLImageElement | null>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => {
-            console.error("Failed to load player image:", imageSrc);
-            resolve(null);
-          };
-          img.src = imageSrc;
-        });
-      }
-
-      renderSticker(imgTemplate, imgPlayer);
-    };
-
-    loadAndRender();
+    renderSticker(templateImgRef.current, playerImgRef.current);
   }, [
     name,
     statValue,
@@ -696,48 +902,79 @@ export default function CanvasPreview({
     photoScale,
     photoX,
     photoY,
+    eraserMode,
+    brushSize,
+    resetEraserTrigger,
+    undoEraserTrigger,
+    drawTrigger,
     nameY,
     teamY,
     overallX,
     overallY,
-    onCanvasReady
+    onCanvasReady,
+    imagesReady
   ]);
 
+  const displayedBrushSize = brushSize * (canvasClientWidth / 600);
+
   return (
-    <div className="flex flex-col items-center gap-4 w-full">
+    <div className="flex flex-col items-center gap-4 w-full relative">
       {/* Aspect-ratio wrapper */}
       <div className="relative w-full max-w-[360px] aspect-[3/4] bg-sport-dark border border-card-border p-1 shadow-2xl overflow-hidden group">
-        <canvas
-          ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleEnd}
-          onMouseLeave={handleEnd}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleEnd}
-          className={`w-full h-full object-contain ${
-            imageSrc ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
-          }`}
-          style={{ imageRendering: "auto", touchAction: "none" }}
-        />
-        
-        {/* Loading watermark Overlay */}
-        {isRemovingBg && (
-          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px]">
-            <div className="relative">
-              <div className="w-16 h-16 rounded-full border-4 border-sport-green/20 border-t-sport-green animate-spin" />
-              <Sparkles className="w-6 h-6 text-sport-green absolute inset-0 m-auto animate-pulse" />
+        <div className="relative w-full h-full">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={() => handleEnd(false)}
+            onMouseLeave={() => handleEnd(true)}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={() => handleEnd(true)}
+            className={`w-full h-full object-contain ${
+              imageSrc 
+                ? (eraserMode 
+                    ? "cursor-none" 
+                    : (isDragging ? "cursor-grabbing" : "cursor-grab")) 
+                : "cursor-default"
+            }`}
+            style={{ imageRendering: "auto", touchAction: "none" }}
+          />
+          
+          {/* Brush size circle preview overlay */}
+          {eraserMode && brushPos && (
+            <div 
+              className="absolute border border-white bg-black/20 rounded-full pointer-events-none z-20 animate-fade-in"
+              style={{
+                width: `${displayedBrushSize}px`,
+                height: `${displayedBrushSize}px`,
+                left: `${brushPos.x - displayedBrushSize / 2}px`,
+                top: `${brushPos.y - displayedBrushSize / 2}px`,
+              }}
+            />
+          )}
+          
+          {/* Loading watermark Overlay */}
+          {isRemovingBg && (
+            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-3 backdrop-blur-[2px]">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full border-4 border-sport-green/20 border-t-sport-green animate-spin" />
+                <Sparkles className="w-6 h-6 text-sport-green absolute inset-0 m-auto animate-pulse" />
+              </div>
+              <span className="text-xs font-bold text-white uppercase tracking-widest font-display">
+                Processando IA...
+              </span>
             </div>
-            <span className="text-xs font-bold text-white uppercase tracking-widest font-display">
-              Processando IA...
-            </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       
-      <p className="text-[10px] text-gray-500 font-medium">
-        {imageSrc ? "🖱️ Clique e arraste na imagem para reposicionar" : "Carregue uma foto para habilitar o arrastar"}
+      <p className="text-[10px] text-gray-500 font-medium text-center">
+        {imageSrc 
+          ? (eraserMode 
+              ? "🧽 Arraste o mouse/dedo na imagem para apagar partes manualmente" 
+              : "🖱️ Clique e arraste na imagem para reposicionar") 
+          : "Carregue uma foto para habilitar o arrastar"}
       </p>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Upload, Download, Sparkles, RefreshCw, AlertCircle, Settings2, ChevronDown, ChevronUp, Camera, Smartphone, X } from "lucide-react";
+import { Upload, Download, Sparkles, RefreshCw, AlertCircle, Settings2, ChevronDown, ChevronUp, Camera, Smartphone, X, Eraser } from "lucide-react";
 
 interface ControlPanelProps {
   name: string;
@@ -28,15 +28,18 @@ interface ControlPanelProps {
   hasTemplate: boolean;
   onResetTemplate: () => void;
 
-  // Photo adjustment sliders
   photoScale: number;
   setPhotoScale: (scale: number) => void;
   photoX: number;
   setPhotoX: (x: number) => void;
   photoY: number;
   setPhotoY: (y: number) => void;
-  photoFadeY: number;
-  setPhotoFadeY: (y: number) => void;
+  eraserMode: boolean;
+  setEraserMode: (mode: boolean) => void;
+  brushSize: number;
+  setBrushSize: (size: number) => void;
+  onResetEraser: () => void;
+  onUndoEraser: () => void;
 
   // Text adjustments
   nameY: number;
@@ -85,8 +88,12 @@ export default function ControlPanel({
   setPhotoX,
   photoY,
   setPhotoY,
-  photoFadeY,
-  setPhotoFadeY,
+  eraserMode,
+  setEraserMode,
+  brushSize,
+  setBrushSize,
+  onResetEraser,
+  onUndoEraser,
   nameY,
   setNameY,
   teamY,
@@ -392,25 +399,78 @@ export default function ControlPanel({
             />
           </div>
 
-          {/* Slider Borracha (photoFadeY) */}
-          <div className="flex flex-col gap-1 border-t border-card-border/40 pt-2">
-            <div className="flex justify-between text-[11px] text-gray-400">
-              <span className="font-bold text-sport-yellow">Borracha (Apagar ombros/base)</span>
-              <span className="text-white font-mono">{photoFadeY}px</span>
+          {/* Borracha Manual Section */}
+          <div className="border-t border-card-border/40 pt-3 flex flex-col gap-2.5">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-white uppercase tracking-wide flex items-center gap-1.5">
+                <Eraser className="w-3.5 h-3.5 text-sport-yellow" />
+                Borracha Manual (Apagar Ombros)
+              </span>
+              {eraserMode && (
+                <span className="text-[9px] bg-red-950 text-red-400 px-1.5 py-0.5 uppercase font-bold rounded-xs animate-pulse">
+                  Modo Borracha Ativo
+                </span>
+              )}
             </div>
-            <input
-              id="slider-photo-fade-y"
-              type="range"
-              min="200"
-              max="650"
-              step="5"
-              value={photoFadeY}
-              onChange={(e) => setPhotoFadeY(parseInt(e.target.value))}
-              className="w-full accent-sport-yellow h-1 bg-sport-dark rounded-lg cursor-pointer"
-            />
-            <p className="text-[9px] text-gray-400 leading-tight">
-              Arraste para a esquerda para apagar o casaco/ombros de baixo e encaixar o pescoço na camiseta amarela do molde.
-            </p>
+
+            <div className="flex flex-col gap-2">
+              <button
+                id="btn-toggle-eraser"
+                type="button"
+                onClick={() => setEraserMode(!eraserMode)}
+                className={`w-full py-2.5 px-3 text-xs font-bold uppercase transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 border rounded-xs ${
+                  eraserMode 
+                    ? "bg-sport-yellow text-black border-sport-yellow font-extrabold shadow-md shadow-sport-yellow/10" 
+                    : "bg-[#1E293B] hover:bg-[#2A374E] text-white border-card-border"
+                }`}
+              >
+                <Eraser className="w-4 h-4" />
+                {eraserMode ? "Desativar Borracha" : "Ativar Borracha"}
+              </button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  id="btn-undo-eraser"
+                  type="button"
+                  onClick={onUndoEraser}
+                  className="py-2 px-3 text-xs font-bold uppercase transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 border bg-[#1E293B] hover:bg-[#2A374E] text-white border-card-border rounded-xs"
+                >
+                  Desfazer
+                </button>
+
+                <button
+                  id="btn-clear-eraser"
+                  type="button"
+                  onClick={onResetEraser}
+                  className="py-2 px-3 text-xs font-bold uppercase transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 border bg-red-950/20 hover:bg-red-950/40 text-red-400 border-red-950/50 hover:border-red-900/50 rounded-xs"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Reiniciar
+                </button>
+              </div>
+            </div>
+
+            {eraserMode && (
+              <div className="flex flex-col gap-1 bg-sport-dark/40 p-2.5 border border-card-border/30 rounded-xs">
+                <div className="flex justify-between text-[10px] text-gray-400">
+                  <span>Espessura do Pincel</span>
+                  <span className="text-white font-mono">{brushSize}px</span>
+                </div>
+                <input
+                  id="slider-eraser-brush-size"
+                  type="range"
+                  min="10"
+                  max="100"
+                  step="5"
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                  className="w-full accent-sport-yellow h-1 bg-sport-dark rounded-lg cursor-pointer"
+                />
+                <p className="text-[9px] text-gray-400 mt-1 leading-tight">
+                  💡 Arraste o mouse/dedo diretamente sobre a figurinha para apagar o seu casaco original e encaixar a cabeça no molde.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
