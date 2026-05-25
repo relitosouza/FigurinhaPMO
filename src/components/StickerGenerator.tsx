@@ -20,6 +20,7 @@ export default function StickerGenerator() {
   const [photoScale, setPhotoScale] = useState(1.0);
   const [photoX, setPhotoX] = useState(0);
   const [photoY, setPhotoY] = useState(0);
+  const [photoFadeY, setPhotoFadeY] = useState(520);
 
   // Text coordinate positions (matching default Panini 2026 vector template)
   const [nameY, setNameY] = useState(697);
@@ -220,6 +221,8 @@ export default function StickerGenerator() {
             setPhotoX={setPhotoX}
             photoY={photoY}
             setPhotoY={setPhotoY}
+            photoFadeY={photoFadeY}
+            setPhotoFadeY={setPhotoFadeY}
             nameY={nameY}
             setNameY={setNameY}
             teamY={teamY}
@@ -254,6 +257,7 @@ export default function StickerGenerator() {
               photoY={photoY}
               setPhotoX={setPhotoX}
               setPhotoY={setPhotoY}
+              photoFadeY={photoFadeY}
               nameY={nameY}
               teamY={teamY}
               overallX={overallX}

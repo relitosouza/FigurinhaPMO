@@ -35,6 +35,8 @@ interface ControlPanelProps {
   setPhotoX: (x: number) => void;
   photoY: number;
   setPhotoY: (y: number) => void;
+  photoFadeY: number;
+  setPhotoFadeY: (y: number) => void;
 
   // Text adjustments
   nameY: number;
@@ -83,6 +85,8 @@ export default function ControlPanel({
   setPhotoX,
   photoY,
   setPhotoY,
+  photoFadeY,
+  setPhotoFadeY,
   nameY,
   setNameY,
   teamY,
@@ -386,6 +390,27 @@ export default function ControlPanel({
               onChange={(e) => setPhotoY(parseInt(e.target.value))}
               className="w-full accent-sport-green h-1 bg-sport-dark rounded-lg cursor-pointer"
             />
+          </div>
+
+          {/* Slider Borracha (photoFadeY) */}
+          <div className="flex flex-col gap-1 border-t border-card-border/40 pt-2">
+            <div className="flex justify-between text-[11px] text-gray-400">
+              <span className="font-bold text-sport-yellow">Borracha (Apagar ombros/base)</span>
+              <span className="text-white font-mono">{photoFadeY}px</span>
+            </div>
+            <input
+              id="slider-photo-fade-y"
+              type="range"
+              min="200"
+              max="650"
+              step="5"
+              value={photoFadeY}
+              onChange={(e) => setPhotoFadeY(parseInt(e.target.value))}
+              className="w-full accent-sport-yellow h-1 bg-sport-dark rounded-lg cursor-pointer"
+            />
+            <p className="text-[9px] text-gray-400 leading-tight">
+              Arraste para a esquerda para apagar o casaco/ombros de baixo e encaixar o pescoço na camiseta amarela do molde.
+            </p>
           </div>
         </div>
       )}

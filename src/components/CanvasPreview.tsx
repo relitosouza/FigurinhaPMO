@@ -24,6 +24,7 @@ interface CanvasPreviewProps {
   photoY: number;
   setPhotoX: (x: number) => void;
   setPhotoY: (y: number) => void;
+  photoFadeY: number;
 
   // Text coordinate overrides
   nameY: number;
@@ -184,6 +185,7 @@ export default function CanvasPreview({
   photoY,
   setPhotoX,
   setPhotoY,
+  photoFadeY,
   nameY,
   teamY,
   overallX,
@@ -376,7 +378,9 @@ export default function CanvasPreview({
           ctx.restore();
 
           // Apply linear gradient mask (eraser effect) to blend the bottom smoothly
-          const fadeGrad = ctx.createLinearGradient(0, 520, 0, 670);
+          const fadeStart = photoFadeY;
+          const fadeEnd = Math.min(670, photoFadeY + 120);
+          const fadeGrad = ctx.createLinearGradient(0, fadeStart, 0, fadeEnd);
           fadeGrad.addColorStop(0, "rgba(0, 0, 0, 1)");
           fadeGrad.addColorStop(0.7, "rgba(0, 0, 0, 0.95)");
           fadeGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
@@ -453,7 +457,9 @@ export default function CanvasPreview({
           ctx.restore();
 
           // Apply linear gradient mask (eraser effect) to blend the bottom smoothly
-          const fadeGrad = ctx.createLinearGradient(0, 520, 0, 660);
+          const fadeStart = photoFadeY;
+          const fadeEnd = Math.min(660, photoFadeY + 120);
+          const fadeGrad = ctx.createLinearGradient(0, fadeStart, 0, fadeEnd);
           fadeGrad.addColorStop(0, "rgba(0, 0, 0, 1)");
           fadeGrad.addColorStop(0.7, "rgba(0, 0, 0, 0.95)");
           fadeGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
