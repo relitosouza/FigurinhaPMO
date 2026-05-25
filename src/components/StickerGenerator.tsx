@@ -14,7 +14,7 @@ export default function StickerGenerator() {
   const [theme, setTheme] = useState("oficial");
 
   // Custom template state
-  const [templateSrc, setTemplateSrc] = useState<string | null>("/figurinha.svg");
+  const [templateSrc, setTemplateSrc] = useState<string | null>("/figurinha.png");
 
   // Photo positioning adjustments
   const [photoScale, setPhotoScale] = useState(1.0);
@@ -41,7 +41,7 @@ export default function StickerGenerator() {
   useEffect(() => {
     return () => {
       if (imageSrc) URL.revokeObjectURL(imageSrc);
-      if (templateSrc && templateSrc !== "/figurinha.svg") {
+      if (templateSrc && templateSrc !== "/figurinha.png") {
         URL.revokeObjectURL(templateSrc);
       }
     };
@@ -124,7 +124,7 @@ export default function StickerGenerator() {
   };
 
   const handleTemplateSelected = (file: File) => {
-    if (templateSrc && templateSrc !== "/figurinha.svg") {
+    if (templateSrc && templateSrc !== "/figurinha.png") {
       URL.revokeObjectURL(templateSrc);
     }
     const url = URL.createObjectURL(file);
@@ -132,10 +132,10 @@ export default function StickerGenerator() {
   };
 
   const handleResetTemplate = () => {
-    if (templateSrc && templateSrc !== "/figurinha.svg") {
+    if (templateSrc && templateSrc !== "/figurinha.png") {
       URL.revokeObjectURL(templateSrc);
     }
-    setTemplateSrc("/figurinha.svg");
+    setTemplateSrc("/figurinha.png");
   };
 
   const handleDownload = () => {
@@ -212,7 +212,7 @@ export default function StickerGenerator() {
             hasImage={!!imageSrc}
             onResetImage={handleResetImage}
             onTemplateSelected={handleTemplateSelected}
-            hasTemplate={templateSrc !== null && templateSrc !== "/figurinha.svg"}
+            hasTemplate={templateSrc !== null && templateSrc !== "/figurinha.png"}
             onResetTemplate={handleResetTemplate}
             photoScale={photoScale}
             setPhotoScale={setPhotoScale}
