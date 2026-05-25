@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState } from "react";
-import { Upload, Download, Sparkles, RefreshCw, AlertCircle, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, Download, Sparkles, RefreshCw, AlertCircle, Settings2, ChevronDown, ChevronUp, Camera, Smartphone, X } from "lucide-react";
 
 interface ControlPanelProps {
   name: string;
@@ -94,7 +94,17 @@ export default function ControlPanel({
 }: ControlPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const templateInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrUrl, setQrUrl] = useState("");
+
+  const handleOpenQrModal = () => {
+    if (typeof window !== "undefined") {
+      setQrUrl(window.location.href);
+    }
+    setShowQrModal(true);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -114,6 +124,10 @@ export default function ControlPanel({
 
   const triggerTemplateUpload = () => {
     templateInputRef.current?.click();
+  };
+
+  const triggerCameraUpload = () => {
+    cameraInputRef.current?.click();
   };
 
   return (
@@ -180,17 +194,44 @@ export default function ControlPanel({
         </label>
         
         {!hasImage ? (
-          <button
-            id="btn-upload-photo"
-            type="button"
-            onClick={triggerUpload}
-            disabled={isRemovingBg}
-            className="flex flex-col items-center justify-center border-2 border-dashed border-card-border hover:border-sport-green bg-[#161B26] hover:bg-[#1C2333] p-8 transition-colors duration-200 focus:outline-none cursor-pointer group disabled:opacity-50"
-          >
-            <Upload className="w-8 h-8 text-gray-400 group-hover:text-sport-green mb-2 transition-colors" />
-            <span className="text-sm font-medium text-white">Fazer Upload da Foto</span>
-            <span className="text-[11px] text-gray-400 mt-1">PNG, JPG até 10MB</span>
-          </button>
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                id="btn-upload-photo-gallery"
+                type="button"
+                onClick={triggerUpload}
+                disabled={isRemovingBg}
+                className="flex flex-col items-center justify-center border border-card-border hover:border-sport-green bg-[#161B26] hover:bg-[#1C2333] p-4 transition-all duration-200 focus:outline-none cursor-pointer group disabled:opacity-50 rounded-xs text-center min-h-[96px]"
+              >
+                <Upload className="w-5 h-5 text-gray-400 group-hover:text-sport-green mb-1.5 transition-colors" />
+                <span className="text-xs font-bold text-white uppercase tracking-wide">Galeria</span>
+                <span className="text-[9px] text-gray-400 mt-0.5">Escolher arquivo</span>
+              </button>
+
+              <button
+                id="btn-upload-photo-camera"
+                type="button"
+                onClick={triggerCameraUpload}
+                disabled={isRemovingBg}
+                className="flex flex-col items-center justify-center border border-card-border hover:border-sport-green bg-[#161B26] hover:bg-[#1C2333] p-4 transition-all duration-200 focus:outline-none cursor-pointer group disabled:opacity-50 rounded-xs text-center min-h-[96px]"
+              >
+                <Camera className="w-5 h-5 text-gray-400 group-hover:text-sport-green mb-1.5 transition-colors" />
+                <span className="text-xs font-bold text-white uppercase tracking-wide">Tirar Foto</span>
+                <span className="text-[9px] text-gray-400 mt-0.5">Usar câmera</span>
+              </button>
+            </div>
+
+            <button
+              id="btn-upload-phone-qr"
+              type="button"
+              onClick={handleOpenQrModal}
+              disabled={isRemovingBg}
+              className="flex items-center justify-center gap-2 border border-dashed border-card-border hover:border-sport-yellow bg-[#161B26] hover:bg-[#1C2333]/80 py-3 px-4 transition-all duration-200 focus:outline-none cursor-pointer text-xs font-bold text-white uppercase rounded-xs"
+            >
+              <Smartphone className="w-4 h-4 text-sport-yellow" />
+              <span>Enviar do Celular (QR Code)</span>
+            </button>
+          </div>
         ) : (
           <div className="flex items-center justify-between p-3 bg-[#161B26] border border-card-border">
             <div className="flex items-center gap-3 overflow-hidden">
@@ -222,6 +263,16 @@ export default function ControlPanel({
           ref={fileInputRef}
           onChange={handleFileChange}
           accept="image/*"
+          className="hidden"
+        />
+
+        <input
+          id="camera-file-input"
+          type="file"
+          ref={cameraInputRef}
+          onChange={handleFileChange}
+          accept="image/*"
+          capture="user"
           className="hidden"
         />
 
@@ -541,6 +592,63 @@ export default function ControlPanel({
           Se o molde base estiver desalinhado com o texto, use a aba &quot;Ajuste Fino de Layout&quot; para reposicionar os campos perfeitamente.
         </p>
       </div>
+
+      {/* Modal QR Code */}
+      {showQrModal && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-xs p-4 animate-fade-in"
+          onClick={() => setShowQrModal(false)}
+        >
+          <div 
+            className="bg-[#11141D] border border-card-border p-6 max-w-sm w-full flex flex-col items-center gap-4 relative rounded-xs shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              id="btn-close-qr-modal-x"
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-white cursor-pointer transition-colors p-1"
+              aria-label="Fechar Modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center flex flex-col gap-1 mt-2">
+              <h3 className="text-lg font-bold text-white font-display uppercase tracking-wide">
+                Enviar Foto do Celular
+              </h3>
+              <p className="text-xs text-gray-400">
+                Aponte a câmera do seu celular para o QR Code abaixo para abrir o criador diretamente no seu aparelho.
+              </p>
+            </div>
+
+            <div className="bg-white p-3 border-4 border-sport-green rounded-xs shadow-lg flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrUrl)}`} 
+                alt="QR Code do site" 
+                className="w-40 h-40 select-none"
+              />
+            </div>
+
+            <div className="text-center w-full">
+              <span className="text-[10px] text-gray-500 block mb-1">URL do Site:</span>
+              <span className="text-[11px] text-gray-400 font-mono bg-sport-dark/50 px-2 py-1 select-all break-all border border-card-border/50 block rounded-xs">
+                {qrUrl}
+              </span>
+            </div>
+
+            <button
+              id="btn-close-qr-modal"
+              type="button"
+              onClick={() => setShowQrModal(false)}
+              className="mt-2 w-full bg-sport-dark hover:bg-sport-dark/80 text-white font-bold py-2 px-4 text-xs uppercase tracking-wider rounded-xs cursor-pointer border border-card-border transition-colors"
+            >
+              Entendi, Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

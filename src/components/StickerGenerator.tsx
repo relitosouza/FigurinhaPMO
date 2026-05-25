@@ -252,6 +252,8 @@ export default function StickerGenerator() {
               photoScale={photoScale}
               photoX={photoX}
               photoY={photoY}
+              setPhotoX={setPhotoX}
+              setPhotoY={setPhotoY}
               nameY={nameY}
               teamY={teamY}
               overallX={overallX}
