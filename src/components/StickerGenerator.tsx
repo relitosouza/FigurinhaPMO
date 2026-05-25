@@ -30,7 +30,7 @@ export default function StickerGenerator() {
   // Image and processing state
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [originalFile, setOriginalFile] = useState<File | null>(null);
-  const [removeBg, setRemoveBg] = useState(true);
+  const [removeBg, setRemoveBg] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [bgProgress, setBgProgress] = useState(0);
 

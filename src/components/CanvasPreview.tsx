@@ -349,6 +349,10 @@ export default function CanvasPreview({
         ctx.fillStyle = colorBg;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Draw template base first
+        ctx.drawImage(imgTemplate, 0, 0, canvas.width, canvas.height);
+
+        // Draw player photo on top of template, clipped to inner border
         if (imgPlayer) {
           ctx.save();
           const cx = 250;
@@ -371,7 +375,6 @@ export default function CanvasPreview({
           ctx.restore();
         }
 
-        ctx.drawImage(imgTemplate, 0, 0, canvas.width, canvas.height);
         drawTextOverlays();
       } else {
         // CASE B: Fallback Vector Template
@@ -624,17 +627,25 @@ export default function CanvasPreview({
       let imgPlayer: HTMLImageElement | null = null;
 
       if (templateSrc) {
-        imgTemplate = await new Promise<HTMLImageElement>((resolve) => {
+        imgTemplate = await new Promise<HTMLImageElement | null>((resolve) => {
           const img = new Image();
           img.onload = () => resolve(img);
+          img.onerror = () => {
+            console.error("Failed to load template:", templateSrc);
+            resolve(null);
+          };
           img.src = templateSrc;
         });
       }
 
       if (imageSrc) {
-        imgPlayer = await new Promise<HTMLImageElement>((resolve) => {
+        imgPlayer = await new Promise<HTMLImageElement | null>((resolve) => {
           const img = new Image();
           img.onload = () => resolve(img);
+          img.onerror = () => {
+            console.error("Failed to load player image:", imageSrc);
+            resolve(null);
+          };
           img.src = imageSrc;
         });
       }
