@@ -1,26 +1,61 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #090B0F;
+  --foreground: #F3F4F6;
+  --card: #11141D;
+  --border: #1E2538;
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-card-bg: var(--card);
+  --color-card-border: var(--border);
+  
+  --font-display: var(--font-barlow-condensed), sans-serif;
+  --font-sans: var(--font-geist-sans), sans-serif;
+  
+  /* Sporty custom colors */
+  --color-sport-green: #00FF66;
+  --color-sport-yellow: #FFD700;
+  --color-sport-blue: #0047AB;
+  --color-sport-red: #FF3B30;
+  --color-sport-dark: #0D0E12;
+  --color-sport-gold: #D4AF37;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+  overflow-x: hidden;
 }
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #090B0F;
+}
+::-webkit-scrollbar-thumb {
+  background: #1E2538;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00FF66;
+}
+
+/* Pulse animation for background removal */
+@keyframes scanning {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+
+.animate-scan {
+  animation: scanning 2.5s infinite linear;
+}
+
+/* UX Audit Help: label placeholder aria-label */
